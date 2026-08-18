@@ -92,9 +92,11 @@ it's also exposed standalone so the user can re-auth without re-running setup.
   `lmfriend`. There is no manual `--client-id` / `--scope` surface, and we're not adding one until a
   server forces the issue. If DCR fails, say so plainly — that's a server that needs a real answer,
   not a workaround.
-- Persist the DCR result via `DynamicClientRegistrationOptions.ResponseDelegate`, alongside the
-  tokens. Without this we register a brand new client on every single run, which litters the auth
-  server with orphaned registrations and loses us the credential the refresh flow depends on.
+- DCR credentials need no special handling: `TokenContainer` already carries `ClientId`,
+  `ClientSecret`, `TokenEndpointAuthMethod` and `AuthorizationServer`, and the SDK calls
+  `RestoreCachedClientCredentials` when a provider starts with no client ID. So long as `TokenStore`
+  round-trips the whole container faithfully, registration survives across runs and we don't litter
+  the auth server with a fresh client per invocation. No `ResponseDelegate` required.
 - The callback handler launches the system browser (`ProcessStartInfo` with `UseShellExecute = true`)
   and runs an `HttpListener` on a loopback port to catch the redirect. Serve a plain "you can close
   this tab" HTML response so the user gets feedback.
@@ -179,7 +181,8 @@ Claude Desktop restart).
   strip any trailing slash, drop the fragment. `login` and `proxy` must derive byte-identical hashes
   or you get "no valid credentials" immediately after a successful login, which is a genuinely
   maddening afternoon. Define it once, in one helper, used by both.
-- Stores the DCR client credentials next to the tokens (see `login`).
+- Persists the **whole** `TokenContainer`, not just the access/refresh pair — the client
+  registration fields live in there too, and dropping them means re-registering on every run.
 - **Atomic writes**: temp file + rename, and tolerate reading a stale token. Two proxy processes can
   point at the same URL under different config names, and with refresh-token rotation one process's
   refresh invalidates the other's. We accept the occasional redundant re-auth; we don't accept a
