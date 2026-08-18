@@ -1,0 +1,22 @@
+# lmfriend tasks. All warnings are errors; AOT publish is the real product.
+# Note: `mise run test` needs python3 with no extra packages.
+
+[tasks.build]
+description = "Compile (warnings are errors)"
+run = "dotnet build -c Release"
+
+[tasks.publish]
+description = "AOT publish: single self-contained binary in bin/Release/net10.0/linux-x64/publish"
+run = "dotnet publish -c Release -r linux-x64"
+
+[tasks.test]
+description = "Drive the published binary through the mock-server acceptance harness"
+depends = ["publish"]
+run = [
+  "python3 tests/reconnect_test.py",
+  "pkill -f 'mock_server[.]py' || true",
+]
+
+[tasks.clean]
+description = "Nuke build artifacts"
+run = ["dotnet clean -c Release", "rm -rf bin obj"]
