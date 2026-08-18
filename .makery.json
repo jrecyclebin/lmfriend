@@ -1,0 +1,4 @@
+{
+  "lint": {"makeprg": "dotnet build -c Release 2>&1 | grep -E '(error|warning)'"},
+  "staged": {"makeprg": "dotnet build -c Release 2>&1 | grep -E '(error|warning)'"}
+}
