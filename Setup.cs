@@ -106,9 +106,18 @@ static class Setup
 
       Console.WriteLine($"logging in to {url} - a browser window will open shortly.");
       // CreateAsync runs the real initialize handshake: success means we've exercised the token.
-      await using var client = await McpClient.CreateAsync(transport,
-        new McpClientOptions { ClientInfo = new Implementation { Name = "lmfriend", Version = "1.0.0" } },
-        Shared.Logs, timeout.Token);
+      // Two budget traps in the SDK default: InitializationTimeout (60s) starts BEFORE the
+      // first request, so it fires while the user is still reading the browser page; and the
+      // server/discover probe (5s) can die mid-OAuth and send a second, un-authed initialize.
+      // Pin an initialize-capable protocol version so there's exactly one request doing the
+      // OAuth dance, and give it the same human-paced budget as the rest of the flow.
+      var options = new McpClientOptions
+      {
+        ClientInfo = new Implementation { Name = "lmfriend", Version = "1.0.0" },
+        ProtocolVersion = "2025-06-18",
+        InitializationTimeout = TimeSpan.FromMinutes(5),
+      };
+      await using var client = await McpClient.CreateAsync(transport, options, Shared.Logs, timeout.Token);
       Console.WriteLine($"authenticated with {client.ServerInfo.Name} {client.ServerInfo.Version} - tokens saved.");
       return 0;
     }
