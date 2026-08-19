@@ -1,11 +1,32 @@
-# lmfriend
+# LMFriend
 
 *Your LAN's MCP friend.* 🌐
 
+This is kind of a half-baked project to replace mcp-remote for Claude Desktop
+with a single self-contained program. The thing is, though, that it seems to
+work quite well! I was having a lot of issues with constant errors coming from
+my custom MCPs in Claude Desktop - no more.
+
+Here are the main features:
+
+- **Resilience.** If you get logged out or the MCP drops its connection, LMFriend
+  will keep its connection to Claude Desktop and work to get it back in order.
+
+- **No dependencies.** With mcp-remote, you're going to need to get Node
+  installed and get the right paths into Claude's config. Let's just not worry
+  about any of that.
+
+- **Ease of setup.** No hand-editing config files - LMFriend has a `setup` command
+  for installing several MCPs at once and logging in before you even start up
+  Claude Desktop.
+
+Not just good for Claude Desktop - you can use this anywhere stdio-type MCPs are
+supported to give you access to HTTP MCPs that may require OAuth.
+
+## Why LAN?
+
 Claude Desktop can only spawn local subprocesses for MCP, and its cloud-side remote
-connectors can't see your home network. **lmfriend** is the little bridge that fixes
-that: it speaks stdio on one side (where Claude Desktop lives) and Streamable HTTP + OAuth
-on the other (where your LAN servers live), and it refuses, politely and at length, to die.
+connectors can't see your home network.
 
 ```
 Claude Desktop ──stdio──> lmfriend proxy ──HTTPS + OAuth──> MCP server on your LAN
@@ -17,14 +38,10 @@ One self-contained binary, no .NET runtime required, ships as a single file.
 
 ## Quick start
 
-Build it:
+Download the latest release and unzip it somewhere permanent. (For instance, I
+like to put it in %APPDATA%\LMFriend.)
 
-```sh
-mise run publish        # AOT binary -> bin/Release/net10.0/linux-x64/publish/lmfriend
-cp bin/Release/net10.0/linux-x64/publish/lmfriend ~/.local/bin/
-```
-
-Then point Claude Desktop at a server and log in, in one motion:
+Drop into that folder with Powershell and run:
 
 ```sh
 lmfriend setup lab=https://mcpbox.lan:9009/mcp
@@ -34,11 +51,6 @@ That's the whole ceremony. `setup` edits `claude_desktop_config.json` for you (a
 backing it up to `.bak`), wires in a `proxy` entry, runs the OAuth login in your
 browser, and reminds you to fully restart Claude Desktop. After that, the server
 just appears in your tool list like it always belonged there.
-
-> 💡 **RESTART MEANS RESTART**
->
-> Claude Desktop reads its config only at launch. Quit it fully (check the system
-> tray!) and reopen, or your shiny new server stays invisible and everyone is sad.
 
 ## The three commands
 
