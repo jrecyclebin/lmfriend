@@ -265,17 +265,39 @@ static class Setup
 
   static string DefaultConfigPath()
   {
+    const string FileName = "claude_desktop_config.json";
+
     if (OperatingSystem.IsWindows())
-      return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "Claude", "claude_desktop_config.json");
+    {
+      var roaming = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Claude", FileName);
+
+      // The Store build is packaged, so its %APPDATA% writes are redirected into a
+      // per-package container that outside processes don't see. Look there first.
+      var packages = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Packages");
+      if (Directory.Exists(packages))
+      {
+        foreach (var dir in Directory.EnumerateDirectories(packages, "Claude_*"))
+        {
+          var packaged = Path.Combine(dir, "LocalCache", "Roaming", "Claude", FileName);
+          if (File.Exists(packaged))
+            return packaged;
+        }
+      }
+
+      return roaming;
+    }
+
     if (OperatingSystem.IsMacOS())
       return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        "Library", "Application Support", "Claude", "claude_desktop_config.json");
+        "Library", "Application Support", "Claude", FileName);
+
     var xdg = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
     var baseDir = string.IsNullOrEmpty(xdg)
       ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config")
       : xdg;
-    return Path.Combine(baseDir, "Claude", "claude_desktop_config.json");
+    return Path.Combine(baseDir, "Claude", FileName);
   }
 
   static int Fail(string message)
