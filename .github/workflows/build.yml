@@ -74,6 +74,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
+      # gh release needs a git directory to resolve its target commit.
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           pattern: lmfriend-*
