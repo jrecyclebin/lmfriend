@@ -17,6 +17,17 @@ run = [
   "pkill -f 'mock_server[.]py' || true",
 ]
 
+[tasks.release]
+description = "Tag v<version>, push the tag, CI builds zips and attaches them to the GitHub Release"
+usage = 'arg "<version>" help="semver without the v, e.g. 1.2.0"'
+run = '''
+set -e
+echo "v{{arg(name="version")}}" | grep -qE '^v[0-9]+\\.[0-9]+\\.[0-9]+$' || { echo "want <major>.<minor>.<patch>, got '{{arg(name="version")}}'"; exit 1; }
+git diff --quiet HEAD -- || { echo "working tree not clean - commit first"; exit 1; }
+git tag -a "v{{arg(name="version")}}" -m "v{{arg(name="version")}}"
+git push origin "v{{arg(name="version")}}"
+'''
+
 [tasks.clean]
 description = "Nuke build artifacts"
 run = ["dotnet clean -c Release", "rm -rf bin obj"]

@@ -1,13 +1,36 @@
 name: build
 
 on:
+  # Full build + zip only on PR merges to main and on release tags.
   push:
-    branches: [main]
+    tags: ['v*']
   pull_request:
+    types: [opened, synchronize, closed]
+    branches: [main]
   workflow_dispatch:
 
+# Tests are cheap insurance: they run on every PR state (including the merge
+# event). The heavy AOT publish matrix only runs on merges, tags and dispatch.
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: dotnet publish -c Release -r linux-x64 --self-contained
+      - run: python3 tests/reconnect_test.py
+
   publish:
+    # Native AOT can't cross-compile: one runner per platform.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     strategy:
       fail-fast: false
       matrix:
@@ -25,31 +48,35 @@ jobs:
       - name: Publish self-contained AOT binary
         run: dotnet publish -c Release -r ${{ matrix.rid }} --self-contained
 
+      # Just the bare executable: the binary is the whole product.
       - name: Zip the binary (unix)
         if: runner.os != 'Windows'
         run: zip -j bin/lmfriend-${{ matrix.rid }}.zip bin/Release/net10.0/${{ matrix.rid }}/publish/${{ matrix.exe }}
 
       - name: Zip the binary (windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           Compress-Archive -Path bin/Release/net10.0/${{ matrix.rid }}/publish/${{ matrix.exe }} `
             -DestinationPath bin/lmfriend-${{ matrix.rid }}.zip
-        shell: pwsh
 
       - uses: actions/upload-artifact@v4
         with:
           name: lmfriend-${{ matrix.rid }}
           path: bin/lmfriend-${{ matrix.rid }}.zip
 
-  test:
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/download-artifact@v4
         with:
-          dotnet-version: 10.0.x
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-      - run: dotnet publish -c Release -r linux-x64 --self-contained
-      - run: python3 tests/reconnect_test.py
+          pattern: lmfriend-*
+          merge-multiple: true
+      - name: Create release and attach zips
+        run: gh release create "${GITHUB_REF_NAME}" --generate-notes --title "${GITHUB_REF_NAME}" lmfriend-*.zip
