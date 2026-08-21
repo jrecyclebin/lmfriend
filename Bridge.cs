@@ -129,7 +129,17 @@ static class Bridge
           // wait outlives its budget); notifications and stray responses have no waiter, so
           // we just log and drop them.
           if (msg is JsonRpcRequest r)
-            lock (_gate) _held.Add((r, DateTimeOffset.UtcNow.AddSeconds(10)));
+          {
+            // initialize is the handshake. Answering it with an error makes Claude Desktop
+            // tear down the whole server - and it can only bring us back by being restarted.
+            // So hold it forever: the replay on the next successful connect is the only answer
+            // it ever gets. Sitting tight through a long re-auth is exactly the durability we
+            // promised; a fast -32001 here is the one thing that defeats it.
+            var deadline = r.Method == "initialize"
+              ? DateTimeOffset.MaxValue
+              : DateTimeOffset.UtcNow.AddSeconds(10);
+            lock (_gate) _held.Add((r, deadline));
+          }
           else
             Console.Error.WriteLine($"lmfriend: disconnected - dropped {Describe(msg)}");
         }
